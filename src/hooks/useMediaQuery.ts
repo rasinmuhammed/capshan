@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore } from 'react';
 
 type Breakpoint = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
@@ -12,28 +12,24 @@ const breakpoints = {
 };
 
 export const useMediaQuery = (breakpoint: Breakpoint): boolean => {
-    const [matches, setMatches] = useState(false);
+    const query = `(min-width: ${breakpoints[breakpoint]}px)`;
 
-    useEffect(() => {
-        const query = `(min-width: ${breakpoints[breakpoint]}px)`;
-        const media = window.matchMedia(query);
-
-        // Set initial value
-        setMatches(media.matches);
-
-        // Listen for changes
-        const listener = (e: MediaQueryListEvent) => {
-            setMatches(e.matches);
-        };
-
-        media.addEventListener('change', listener);
-        return () => media.removeEventListener('change', listener);
-    }, [breakpoint]);
-
-    return matches;
+    return useSyncExternalStore(
+        (callback) => {
+            const media = window.matchMedia(query);
+            media.addEventListener('change', callback);
+            return () => media.removeEventListener('change', callback);
+        },
+        () => window.matchMedia(query).matches,
+        () => false,
+    );
 };
 
 // Convenience hooks for common breakpoints
 export const useIsMobile = () => !useMediaQuery('md'); // < 768px
-export const useIsTablet = () => useMediaQuery('md') && !useMediaQuery('lg'); // 768px - 1024px
+export const useIsTablet = () => {
+    const isMd = useMediaQuery('md');
+    const isLg = useMediaQuery('lg');
+    return isMd && !isLg;
+}; // 768px - 1024px
 export const useIsDesktop = () => useMediaQuery('lg'); // >= 1024px

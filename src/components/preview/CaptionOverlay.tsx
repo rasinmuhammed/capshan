@@ -287,13 +287,13 @@ const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ videoRef }) => {
     // Determine preset based on templateId or animation style
     const preset: PresetType = useMemo(() => {
         const templateId = captionStyle.templateId;
-        if (templateId === 'hormozi' || templateId === 'viral' || templateId === 'neon') {
+        if (templateId === 'hormozi' || templateId === 'gamer' || templateId === 'meme') {
             return 'hormozi';
         }
-        if (templateId === 'aesthetic') {
+        if (templateId === 'karaoke-fill') {
             return 'karaoke';
         }
-        if (templateId === 'minimal' || templateId === 'classic') {
+        if (templateId === 'veed-clean' || templateId === 'minimal-pro' || templateId === 'hindi-urdu') {
             return 'veed-clean';
         }
         // Default based on animation

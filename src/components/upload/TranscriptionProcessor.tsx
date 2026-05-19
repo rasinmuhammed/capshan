@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Check } from 'lucide-react';
 import { useAppStore } from '../../store/app.store';
@@ -22,12 +22,39 @@ const TranscriptionProcessor: React.FC = () => {
     const {
         mediaFile,
         segments,
+        transcriptionModel,
         setSegments,
+        setTranscriptMetadata,
         setIsTranscribing,
         setError,
     } = useAppStore();
 
     const audioDataRef = useRef<Float32Array | null>(null);
+
+    const startTranscription = useCallback(async () => {
+        if (!mediaFile || !workerRef.current) return;
+
+        setIsTranscribing(true);
+        setCurrentStep(0);
+        setStatus('Preparing your content...');
+
+        try {
+            const audioContext = new AudioContext({ sampleRate: 16000 });
+            const response = await fetch(mediaFile.url);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            const audioData = audioBuffer.getChannelData(0);
+
+            workerRef.current.postMessage({ type: 'init', data: { modelName: transcriptionModel.modelName } });
+
+            audioDataRef.current = audioData;
+
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown audio processing error';
+            setError(`Failed to process audio: ${message}`);
+            setIsTranscribing(false);
+        }
+    }, [mediaFile, setError, setIsTranscribing, transcriptionModel.modelName]);
 
     useEffect(() => {
         if (!mediaFile) return;
@@ -50,7 +77,7 @@ const TranscriptionProcessor: React.FC = () => {
 
             switch (type) {
                 case 'progress':
-                    setStatus(data.message);
+                    setStatus(data.message || data.status || 'Processing...');
                     if (data.progress) setProgress(data.progress);
 
                     // Update step based on message
@@ -62,7 +89,10 @@ const TranscriptionProcessor: React.FC = () => {
                     if (data.status === 'ready' && audioDataRef.current) {
                         workerRef.current?.postMessage({
                             type: 'transcribe',
-                            data: { audioData: audioDataRef.current }
+                            data: {
+                                audioData: audioDataRef.current,
+                                modelName: transcriptionModel.modelName,
+                            }
                         });
                         audioDataRef.current = null; // Clear ref
                     }
@@ -70,6 +100,13 @@ const TranscriptionProcessor: React.FC = () => {
 
                 case 'complete':
                     setSegments(data.segments);
+                    setTranscriptMetadata({
+                        language: data.language || 'en',
+                        engine: 'browser-whisper',
+                        model: data.model || transcriptionModel.modelName,
+                        confidence: data.confidence,
+                        generatedAt: new Date().toISOString(),
+                    });
                     setIsTranscribing(false);
                     setShowConfetti(true);
                     setCurrentStep(4);
@@ -94,33 +131,7 @@ const TranscriptionProcessor: React.FC = () => {
         return () => {
             workerRef.current?.terminate();
         };
-    }, [mediaFile]);
-
-    const startTranscription = async () => {
-        if (!mediaFile || !workerRef.current) return;
-
-        setIsTranscribing(true);
-        setCurrentStep(0);
-        setStatus('Preparing your content...');
-
-        try {
-            // Extract audio data
-            const audioContext = new AudioContext({ sampleRate: 16000 });
-            const response = await fetch(mediaFile.url);
-            const arrayBuffer = await response.arrayBuffer();
-            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-            const audioData = audioBuffer.getChannelData(0);
-
-            // Initialize model
-            workerRef.current.postMessage({ type: 'init', data: { modelName: 'Xenova/whisper-tiny.en' } });
-
-            audioDataRef.current = audioData;
-
-        } catch (error: any) {
-            setError(`Failed to process audio: ${error.message}`);
-            setIsTranscribing(false);
-        }
-    };
+    }, [mediaFile, segments.length, setError, setIsTranscribing, setSegments, setTranscriptMetadata, startTranscription, transcriptionModel.modelName]);
 
     if (!status) return null;
 
@@ -211,4 +222,3 @@ const TranscriptionProcessor: React.FC = () => {
 };
 
 export default TranscriptionProcessor;
-

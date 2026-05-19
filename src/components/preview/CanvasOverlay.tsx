@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../../store/app.store';
-import type { Word } from '../../types';
+import type { TranscriptSegment, Word } from '../../types';
 
 const CanvasOverlay: React.FC<{ videoRef: React.RefObject<HTMLVideoElement | null> }> = ({ videoRef }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -9,7 +9,7 @@ const CanvasOverlay: React.FC<{ videoRef: React.RefObject<HTMLVideoElement | nul
     const { segments, currentTime, captionStyle } = useAppStore();
 
     // Find current word
-    const getCurrentWord = (): { word: Word; segment: any; wordIndex: number } | null => {
+    const getCurrentWord = useCallback((): { word: Word; segment: TranscriptSegment; wordIndex: number } | null => {
         for (const segment of segments) {
             for (let i = 0; i < segment.words.length; i++) {
                 const word = segment.words[i];
@@ -19,9 +19,9 @@ const CanvasOverlay: React.FC<{ videoRef: React.RefObject<HTMLVideoElement | nul
             }
         }
         return null;
-    };
+    }, [currentTime, segments]);
 
-    const drawCaption = () => {
+    const drawCaption = useCallback(() => {
         const canvas = canvasRef.current;
         const video = videoRef.current;
         if (!canvas || !video) return;
@@ -41,7 +41,7 @@ const CanvasOverlay: React.FC<{ videoRef: React.RefObject<HTMLVideoElement | nul
         const currentWordData = getCurrentWord();
         if (!currentWordData) return;
 
-        const { word: _currentWord, segment, wordIndex: currentIndex } = currentWordData;
+        const { segment, wordIndex: currentIndex } = currentWordData;
         const words = segment.words;
 
         // Calculate text position
@@ -282,7 +282,7 @@ const CanvasOverlay: React.FC<{ videoRef: React.RefObject<HTMLVideoElement | nul
         });
 
         animationRef.current = requestAnimationFrame(drawCaption);
-    };
+    }, [captionStyle, getCurrentWord, videoRef]);
 
     useEffect(() => {
         animationRef.current = requestAnimationFrame(drawCaption);
@@ -292,7 +292,7 @@ const CanvasOverlay: React.FC<{ videoRef: React.RefObject<HTMLVideoElement | nul
                 cancelAnimationFrame(animationRef.current);
             }
         };
-    }, [segments, currentTime, captionStyle]);
+    }, [drawCaption]);
 
     return (
         <canvas

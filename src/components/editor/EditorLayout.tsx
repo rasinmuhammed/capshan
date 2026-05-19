@@ -3,6 +3,7 @@ import MediaPlayer from '../preview/MediaPlayer';
 import TranscriptList from './TranscriptList';
 import Waveform from '../timeline/Waveform';
 import ExportPanel from '../export/ExportPanel';
+import ViralCommandCenter from '../viral/ViralCommandCenter';
 
 const EditorLayout: React.FC = () => {
     return (
@@ -27,6 +28,10 @@ const EditorLayout: React.FC = () => {
                             <Waveform />
                         </div>
 
+                        <div className="flex-shrink-0">
+                            <ViralCommandCenter />
+                        </div>
+
                         {/* Export Panel - compact */}
                         <div className="flex-shrink-0">
                             <ExportPanel />
@@ -39,4 +44,3 @@ const EditorLayout: React.FC = () => {
 };
 
 export default EditorLayout;
-

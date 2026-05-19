@@ -33,9 +33,9 @@ const Waveform: React.FC = () => {
             if (!wavesurfer.current) return;
             try {
                 await wavesurfer.current.load(mediaFile.url);
-            } catch (error: any) {
+            } catch (error) {
                 // Ignore AbortError which happens if component unmounts during load
-                if (error.name !== 'AbortError') {
+                if (!(error instanceof DOMException && error.name === 'AbortError')) {
                     console.error('WaveSurfer load error:', error);
                 }
             }
@@ -69,15 +69,15 @@ const Waveform: React.FC = () => {
                     ws.pause();
                     // Destroy immediately but catch errors
                     ws.destroy();
-                } catch (e: any) {
+                } catch (e) {
                     // Ignore AbortError which is common when destroying while loading
-                    if (e.name !== 'AbortError') {
+                    if (!(e instanceof DOMException && e.name === 'AbortError')) {
                         console.debug('WaveSurfer cleanup error:', e);
                     }
                 }
             }
         };
-    }, [mediaFile]);
+    }, [mediaFile, setCurrentTime, setIsPlaying]);
 
     useEffect(() => {
         if (!wavesurfer.current) return;

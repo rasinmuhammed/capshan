@@ -1,128 +1,9 @@
 import { create } from 'zustand';
 import type { AppState, CaptionStyle } from '../types';
+import { CAPTION_PRESETS } from '../utils/captionPresets';
+import { DEFAULT_TRANSCRIPTION_MODEL } from '../utils/transcriptionModels';
 
-// VEED.io-style templates with preview colors
-export const STYLE_TEMPLATES: { id: string; name: string; preview: string; style: Partial<CaptionStyle> }[] = [
-    {
-        id: 'hormozi',
-        name: 'Hormozi',
-        preview: '🔥',
-        style: {
-            displayMode: 'word-by-word',
-            fontFamily: 'Montserrat',
-            fontWeight: 900,
-            fontSize: 56,
-            color: '#ffffff',
-            textTransform: 'uppercase',
-            activeWordColor: '#FFD700',
-            activeWordScale: 1.2,
-            strokeEnabled: true,
-            strokeColor: '#000000',
-            strokeWidth: 4,
-            showBackground: false,
-            glowEnabled: true,
-            glowColor: '#FFD700',
-            animation: 'pop',
-        }
-    },
-    {
-        id: 'viral',
-        name: 'Viral',
-        preview: '✨',
-        style: {
-            displayMode: 'word-by-word',
-            fontFamily: 'Poppins',
-            fontWeight: 800,
-            fontSize: 52,
-            color: '#ffffff',
-            activeWordColor: '#00ff88',
-            activeWordBackground: true,
-            activeWordBackgroundColor: '#00ff88',
-            strokeEnabled: true,
-            strokeColor: '#000000',
-            strokeWidth: 3,
-            showBackground: false,
-            animation: 'bounce',
-        }
-    },
-    {
-        id: 'aesthetic',
-        name: 'Aesthetic',
-        preview: '💫',
-        style: {
-            displayMode: 'typewriter',
-            fontFamily: 'Inter',
-            fontWeight: 600,
-            fontSize: 48,
-            color: '#ffffff',
-            emphasisFontFamily: 'Pinyon Script',
-            emphasisColor: '#ff69b4',
-            emphasisFontSize: 56,
-            autoEmphasize: true,
-            glowEnabled: true,
-            glowColor: '#ff69b4',
-            strokeEnabled: false,
-            animation: 'fade',
-        }
-    },
-    {
-        id: 'minimal',
-        name: 'Minimal',
-        preview: '◯',
-        style: {
-            displayMode: 'line-by-line',
-            fontFamily: 'Inter',
-            fontWeight: 500,
-            fontSize: 44,
-            color: '#ffffff',
-            activeWordColor: '#ffffff',
-            strokeEnabled: false,
-            showBackground: true,
-            backgroundColor: '#000000',
-            backgroundOpacity: 0.6,
-            backgroundRadius: 8,
-            animation: 'fade',
-        }
-    },
-    {
-        id: 'neon',
-        name: 'Neon',
-        preview: '⚡',
-        style: {
-            displayMode: 'word-by-word',
-            fontFamily: 'Outfit',
-            fontWeight: 700,
-            fontSize: 50,
-            color: '#ffffff',
-            activeWordColor: '#ff00ff',
-            glowEnabled: true,
-            glowColor: '#ff00ff',
-            glowIntensity: 30,
-            strokeEnabled: true,
-            strokeColor: '#000000',
-            strokeWidth: 2,
-            animation: 'pop',
-        }
-    },
-    {
-        id: 'classic',
-        name: 'Classic',
-        preview: '📺',
-        style: {
-            displayMode: 'flow',
-            fontFamily: 'Arial',
-            fontWeight: 700,
-            fontSize: 46,
-            color: '#ffffff',
-            activeWordColor: '#ffff00',
-            showBackground: true,
-            backgroundColor: '#000000',
-            backgroundOpacity: 0.8,
-            strokeEnabled: false,
-            animation: 'none',
-        }
-    },
-];
+export const STYLE_TEMPLATES = CAPTION_PRESETS;
 
 const defaultCaptionStyle: CaptionStyle = {
     // Display Mode
@@ -202,6 +83,12 @@ export const useAppStore = create<AppState>((set) => ({
     // Transcription state
     segments: [],
     setSegments: (segments) => set({ segments }),
+    transcriptMetadata: null,
+    setTranscriptMetadata: (metadata) => set({ transcriptMetadata: metadata }),
+    transcriptionModel: DEFAULT_TRANSCRIPTION_MODEL,
+    setTranscriptionModel: (model) => set({ transcriptionModel: model }),
+    viralSuggestion: null,
+    setViralSuggestion: (suggestion) => set({ viralSuggestion: suggestion }),
     isTranscribing: false,
     setIsTranscribing: (isTranscribing) => set({ isTranscribing }),
     transcriptionProgress: 0,

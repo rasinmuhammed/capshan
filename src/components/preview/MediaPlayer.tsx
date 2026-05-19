@@ -48,9 +48,12 @@ const MediaPlayer: React.FC = () => {
     const [playbackRate, setPlaybackRate] = useState(1);
     const [showControls, setShowControls] = useState(true);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
+    const [mediaError, setMediaError] = useState<string | null>(null);
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-    const mediaElement = mediaFile?.type === 'video' ? videoRef.current : audioRef.current;
+    const getMediaElement = useCallback(() => (
+        mediaFile?.type === 'video' ? videoRef.current : audioRef.current
+    ), [mediaFile?.type]);
 
     useEffect(() => {
         const handleMouseMove = () => {
@@ -84,33 +87,15 @@ const MediaPlayer: React.FC = () => {
     }, [isPlaying]);
 
     useEffect(() => {
-        if (!mediaElement || !mediaFile) return;
-
-        const handleTimeUpdate = () => {
-            setCurrentTime(mediaElement.currentTime);
-        };
-
-        const handleLoadedMetadata = () => {
-            setDuration(mediaElement.duration);
-        };
-
-        const handleEnded = () => {
-            setIsPlaying(false);
-            setShowControls(true);
-        };
-
-        mediaElement.addEventListener('timeupdate', handleTimeUpdate);
-        mediaElement.addEventListener('loadedmetadata', handleLoadedMetadata);
-        mediaElement.addEventListener('ended', handleEnded);
-
-        return () => {
-            mediaElement.removeEventListener('timeupdate', handleTimeUpdate);
-            mediaElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
-            mediaElement.removeEventListener('ended', handleEnded);
-        };
-    }, [mediaElement, mediaFile]);
+        if (!mediaFile) return;
+        setMediaError(null);
+        setDuration(mediaFile.duration);
+        setCurrentTime(0);
+        setIsPlaying(false);
+    }, [mediaFile, setCurrentTime, setDuration, setIsPlaying]);
 
     useEffect(() => {
+        const mediaElement = getMediaElement();
         if (!mediaElement) return;
 
         if (isPlaying) {
@@ -118,20 +103,23 @@ const MediaPlayer: React.FC = () => {
         } else {
             mediaElement.pause();
         }
-    }, [isPlaying, mediaElement]);
+    }, [getMediaElement, isPlaying]);
 
     useEffect(() => {
+        const mediaElement = getMediaElement();
         if (!mediaElement) return;
         if (Math.abs(mediaElement.currentTime - currentTime) > 0.5) {
             mediaElement.currentTime = currentTime;
         }
-    }, [currentTime, mediaElement]);
+    }, [currentTime, getMediaElement]);
 
     const togglePlay = () => {
+        if (mediaError) return;
         setIsPlaying(!isPlaying);
     };
 
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const mediaElement = getMediaElement();
         const newVolume = parseFloat(e.target.value);
         setVolume(newVolume);
         if (mediaElement) {
@@ -145,6 +133,7 @@ const MediaPlayer: React.FC = () => {
     };
 
     const toggleMute = () => {
+        const mediaElement = getMediaElement();
         if (mediaElement) {
             mediaElement.muted = !isMuted;
             setIsMuted(!isMuted);
@@ -156,14 +145,19 @@ const MediaPlayer: React.FC = () => {
     };
 
     const skip = (seconds: number) => {
+        const mediaElement = getMediaElement();
         if (mediaElement) {
-            const newTime = Math.max(0, Math.min(mediaElement.duration, mediaElement.currentTime + seconds));
+            const mediaDuration = Number.isFinite(mediaElement.duration) && mediaElement.duration > 0
+                ? mediaElement.duration
+                : duration;
+            const newTime = Math.max(0, Math.min(mediaDuration, mediaElement.currentTime + seconds));
             mediaElement.currentTime = newTime;
             setCurrentTime(newTime);
         }
     };
 
     const changePlaybackRate = (rate: number) => {
+        const mediaElement = getMediaElement();
         setPlaybackRate(rate);
         if (mediaElement) {
             mediaElement.playbackRate = rate;
@@ -171,25 +165,50 @@ const MediaPlayer: React.FC = () => {
     };
 
     const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-        if (!mediaElement || !containerRef.current) return;
+        const mediaElement = getMediaElement();
+        if (!mediaElement || !containerRef.current || duration <= 0) return;
         const progressBar = e.currentTarget;
         const rect = progressBar.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         const newTime = (clickX / rect.width) * duration;
         mediaElement.currentTime = newTime;
         setCurrentTime(newTime);
-    }, [mediaElement, duration, setCurrentTime]);
+    }, [duration, getMediaElement, setCurrentTime]);
 
     const handleSeekHover = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-        if (!mediaElement || !containerRef.current) return;
+        const mediaElement = getMediaElement();
+        if (!mediaElement || !containerRef.current || duration <= 0) return;
         const progressBar = e.currentTarget;
         const rect = progressBar.getBoundingClientRect();
         const hoverX = e.clientX - rect.left;
         const hoverPercentage = Math.max(0, Math.min(1, hoverX / rect.width));
         const time = hoverPercentage * duration;
         setHoverTime(time);
-    }, [mediaElement, duration]);
+    }, [duration, getMediaElement]);
 
+
+    const handleLoadedMetadata = (event: React.SyntheticEvent<HTMLVideoElement | HTMLAudioElement>) => {
+        const nextDuration = event.currentTarget.duration;
+        if (Number.isFinite(nextDuration) && nextDuration > 0) {
+            setDuration(nextDuration);
+        }
+    };
+
+    const handleTimeUpdate = (event: React.SyntheticEvent<HTMLVideoElement | HTMLAudioElement>) => {
+        setCurrentTime(event.currentTarget.currentTime);
+    };
+
+    const handleEnded = () => {
+        setIsPlaying(false);
+        setShowControls(true);
+    };
+
+    const handleMediaError = () => {
+        setMediaError('Preview failed to load this media. Try a local MP4/WebM file, or use the sample only as a transcript demo.');
+        setIsPlaying(false);
+    };
+
+    const progressPercent = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
     if (!mediaFile) return null;
 
@@ -211,12 +230,34 @@ const MediaPlayer: React.FC = () => {
                                 <video
                                     ref={videoRef}
                                     src={mediaFile.url}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain"
                                     playsInline
+                                    preload="metadata"
+                                    crossOrigin={mediaFile.url.startsWith('http') ? 'anonymous' : undefined}
+                                    onLoadedMetadata={handleLoadedMetadata}
+                                    onCanPlay={handleLoadedMetadata}
+                                    onTimeUpdate={handleTimeUpdate}
+                                    onEnded={handleEnded}
+                                    onError={handleMediaError}
                                 />
 
                                 {/* Caption Overlay */}
                                 <CaptionOverlay videoRef={videoRef} />
+
+                                {exportAspectRatio !== 'original' && (
+                                    <div className="pointer-events-none absolute inset-[8%] border border-white/15 rounded-sm">
+                                        <div className="absolute left-0 right-0 top-[18%] border-t border-dashed border-capshan-gold/30" />
+                                        <div className="absolute left-0 right-0 bottom-[18%] border-t border-dashed border-capshan-gold/30" />
+                                    </div>
+                                )}
+
+                                {mediaError && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-black/85 p-6 text-center">
+                                        <div className="max-w-md rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+                                            <p className="text-sm font-semibold text-red-200">{mediaError}</p>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -233,7 +274,7 @@ const MediaPlayer: React.FC = () => {
                             >
                                 <div
                                     className="h-full bg-electric-blue rounded-full relative group-hover:h-2 transition-all"
-                                    style={{ width: `${(currentTime / duration) * 100}%` }}
+                                    style={{ width: `${progressPercent}%` }}
                                 >
                                     <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
                                 </div>
@@ -335,7 +376,16 @@ const MediaPlayer: React.FC = () => {
                     </>
                 ) : (
                     <div className="flex flex-col items-center gap-4">
-                        <audio ref={audioRef} src={mediaFile.url} />
+                        <audio
+                            ref={audioRef}
+                            src={mediaFile.url}
+                            preload="metadata"
+                            onLoadedMetadata={handleLoadedMetadata}
+                            onCanPlay={handleLoadedMetadata}
+                            onTimeUpdate={handleTimeUpdate}
+                            onEnded={handleEnded}
+                            onError={handleMediaError}
+                        />
                         <div className="w-32 h-32 bg-gradient-to-br from-electric-blue to-neon-pink rounded-full animate-pulse" />
                         <p className="text-zinc-400 text-lg">{mediaFile.name}</p>
                     </div>

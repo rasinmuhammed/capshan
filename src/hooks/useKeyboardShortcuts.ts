@@ -83,7 +83,7 @@ export const useKeyboardShortcuts = () => {
 
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isPlaying, currentTime, duration, showStylePanel]);
+    }, [currentTime, duration, isPlaying, setCurrentTime, setIsPlaying, setShowStylePanel, showStylePanel]);
 };
 
 // Export shortcuts definition for documentation

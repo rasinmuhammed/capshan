@@ -5,8 +5,8 @@ import { Sparkles, Shield, Share2, Twitter } from 'lucide-react';
 const Header: React.FC = () => {
     const handleShare = async () => {
         const shareData = {
-            title: 'Capshan - Free AI Caption Generator',
-            text: '🔥 Just found this insane caption generator! 100% free & private - your video never leaves your browser. Try it!',
+            title: 'Capshan - Open-Source Viral Shorts Editor',
+            text: 'Found Capshan: open-source viral captions, local AI transcription, no signup, no watermark.',
             url: window.location.href,
         };
 
@@ -20,7 +20,7 @@ const Header: React.FC = () => {
     };
 
     const handleTweet = () => {
-        const text = encodeURIComponent('🔥 Just found this insane AI caption generator!\n\n✅ 100% FREE\n✅ 100% PRIVATE (runs in browser)\n✅ Word-by-word animations\n✅ Viral templates\n\nTry it:');
+        const text = encodeURIComponent('Found Capshan, an open-source viral shorts editor.\n\nNo signup\nNo watermark\nLocal AI captions\nHook analysis + viral presets\n\nTry it:');
         const url = encodeURIComponent(window.location.href);
         window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
     };
@@ -48,7 +48,7 @@ const Header: React.FC = () => {
                         className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20 text-xs font-medium text-green-400"
                     >
                         <Shield className="w-3 h-3" />
-                        <span>100% Private</span>
+                        <span>Local-first</span>
                     </motion.div>
 
                     {/* Buy Me a Coffee Button */}
@@ -92,4 +92,3 @@ const Header: React.FC = () => {
 };
 
 export default Header;
-

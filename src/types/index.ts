@@ -15,6 +15,59 @@ export interface TranscriptSegment {
     words: Word[];
 }
 
+export type CaptionPresetCategory =
+    | 'creator'
+    | 'clean'
+    | 'podcast'
+    | 'gaming'
+    | 'education'
+    | 'meme'
+    | 'multilingual';
+
+export interface CaptionPreset {
+    id: string;
+    name: string;
+    category: CaptionPresetCategory;
+    preview: string;
+    description: string;
+    exportMode: 'ass' | 'canvas';
+    style: Partial<CaptionStyle>;
+}
+
+export interface TranscriptMetadata {
+    language: string;
+    engine: 'browser-whisper' | 'local-helper';
+    model: string;
+    confidence?: number;
+    generatedAt: string;
+}
+
+export interface TranscriptionModelOption {
+    id: 'fast' | 'balanced' | 'accurate';
+    label: string;
+    modelName: string;
+    description: string;
+    estimatedSize: string;
+}
+
+export interface ViralMoment {
+    id: string;
+    start: number;
+    end: number;
+    title: string;
+    reason: string;
+    score: number;
+}
+
+export interface ViralSuggestion {
+    hookTitle: string;
+    platform: 'TikTok/Reels/Shorts' | 'YouTube' | 'Instagram Feed';
+    moments: ViralMoment[];
+    fillerWords: number;
+    silenceGaps: number;
+    recommendedPresetId: string;
+}
+
 export interface CaptionStyle {
     // Display Mode
     displayMode: 'flow' | 'word-by-word' | 'typewriter' | 'line-by-line';
@@ -101,6 +154,12 @@ export interface AppState {
     // Transcription state
     segments: TranscriptSegment[];
     setSegments: (segments: TranscriptSegment[]) => void;
+    transcriptMetadata: TranscriptMetadata | null;
+    setTranscriptMetadata: (metadata: TranscriptMetadata | null) => void;
+    transcriptionModel: TranscriptionModelOption;
+    setTranscriptionModel: (model: TranscriptionModelOption) => void;
+    viralSuggestion: ViralSuggestion | null;
+    setViralSuggestion: (suggestion: ViralSuggestion | null) => void;
     isTranscribing: boolean;
     setIsTranscribing: (isTranscribing: boolean) => void;
     transcriptionProgress: number;
@@ -144,10 +203,30 @@ export interface AppState {
     setError: (error: string | null) => void;
 }
 
-export interface WorkerMessage {
-    type: 'progress' | 'complete' | 'error';
-    data?: any;
-}
+export type WorkerMessage =
+    | {
+        type: 'progress';
+        data: {
+            status?: string;
+            progress?: number;
+            message?: string;
+        };
+    }
+    | {
+        type: 'complete';
+        data: {
+            segments: TranscriptSegment[];
+            language?: string;
+            model?: string;
+            confidence?: number;
+        };
+    }
+    | {
+        type: 'error';
+        data: {
+            message: string;
+        };
+    };
 
 export interface TranscriptionResult {
     segments: TranscriptSegment[];

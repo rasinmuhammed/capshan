@@ -17,7 +17,8 @@ const TranscriptList: React.FC = () => {
         addSegment,
         setCurrentTime,
         captionStyle,
-        toggleWordEmphasis
+        toggleWordEmphasis,
+        transcriptMetadata
     } = useAppStore();
 
     // Scroll to active segment
@@ -66,6 +67,11 @@ const TranscriptList: React.FC = () => {
             <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50 backdrop-blur-sm z-10">
                 <h3 className="text-sm font-medium text-zinc-400">Transcript</h3>
                 <div className="flex items-center gap-4">
+                    {transcriptMetadata && (
+                        <p className="text-xs text-zinc-500 hidden lg:block">
+                            {transcriptMetadata.model} · {transcriptMetadata.language.toUpperCase()}
+                        </p>
+                    )}
                     <p className="text-xs text-zinc-500 hidden md:block">
                         <span className="font-mono bg-zinc-800 px-1 rounded">Ctrl</span> + Click to emphasize
                     </p>

@@ -16,15 +16,13 @@ self.fetch = async (input, init) => {
         console.log(`[Worker] Fetching: ${url}`);
     }
 
-    // CRITICAL FIX: Rewrite ANY request for the model to Hugging Face if it's not already there
-    // This catches localhost:5173/Xenova... which was slipping through the previous check
-    if (url.includes('Xenova/whisper-tiny.en') && !url.includes('huggingface.co')) {
-        // Extract the part after the model name
-        const parts = url.split('Xenova/whisper-tiny.en/');
-        const fileName = parts[1];
+    // Rewrite local model asset requests to Hugging Face for all supported Whisper models.
+    const modelMatch = url.match(/Xenova\/(whisper-[^/]+)\/(.+)$/);
+    if (modelMatch && !url.includes('huggingface.co')) {
+        const [, modelSlug, fileName] = modelMatch;
 
         if (fileName) {
-            const newUrl = `https://huggingface.co/Xenova/whisper-tiny.en/resolve/main/${fileName}`;
+            const newUrl = `https://huggingface.co/Xenova/${modelSlug}/resolve/main/${fileName}`;
             console.log(`[Worker] Rewriting URL: ${url} -> ${newUrl}`);
             url = newUrl;
 
@@ -64,11 +62,47 @@ self.fetch = async (input, init) => {
     }
 };
 
-let transcriber: any = null;
+type ProgressCallback = {
+    status?: string;
+    loaded?: number;
+    total?: number;
+};
+
+type TranscriptionChunk = {
+    text: string;
+    timestamp?: [number, number];
+};
+
+type TranscriptionOutput = {
+    text?: string;
+    chunks?: TranscriptionChunk[];
+    language?: string;
+};
+
+type Transcriber = (
+    audioData: Float32Array,
+    options: {
+        return_timestamps: 'word';
+        chunk_length_s: number;
+        stride_length_s: number;
+        task?: 'transcribe';
+        language?: 'english';
+        condition_on_previous_text?: boolean;
+    },
+) => Promise<TranscriptionOutput>;
+
+let transcriber: Transcriber | null = null;
+let activeModelName = '';
 
 // Initialize the model
-async function initializeModel(modelName: string = 'Xenova/whisper-tiny.en') {
+async function initializeModel(modelName: string = 'Xenova/whisper-base.en') {
     try {
+        if (transcriber && activeModelName === modelName) {
+            self.postMessage({ type: 'progress', data: { status: 'ready', progress: 100, message: 'Model loaded!' } });
+            return;
+        }
+
+        transcriber = null;
         self.postMessage({ type: 'progress', data: { status: 'loading', progress: 0, message: '✨ Sprinkling magic dust...' } });
 
         console.log('[Worker] Configuring transformers environment...');
@@ -91,9 +125,9 @@ async function initializeModel(modelName: string = 'Xenova/whisper-tiny.en') {
         transcriber = await pipeline('automatic-speech-recognition', modelName, {
             revision: 'main',
             quantized: true,
-            progress_callback: (progress: any) => {
+            progress_callback: (progress: ProgressCallback) => {
                 if (progress.status === 'progress') {
-                    const percent = Math.round((progress.loaded / progress.total) * 100);
+                    const percent = progress.total ? Math.round(((progress.loaded || 0) / progress.total) * 100) : 0;
                     self.postMessage({
                         type: 'progress',
                         data: {
@@ -104,12 +138,13 @@ async function initializeModel(modelName: string = 'Xenova/whisper-tiny.en') {
                     });
                 }
             },
-        });
+        }) as unknown as Transcriber;
+        activeModelName = modelName;
 
         self.postMessage({ type: 'progress', data: { status: 'ready', progress: 100, message: 'Model loaded!' } });
-    } catch (error: any) {
+    } catch (error) {
         console.error('Model initialization error:', error);
-        self.postMessage({ type: 'error', data: { message: error.message || 'Failed to load model' } });
+        self.postMessage({ type: 'error', data: { message: error instanceof Error ? error.message : 'Failed to load model' } });
     }
 }
 
@@ -140,10 +175,10 @@ function interpolateWordTimestamps(text: string, start: number, end: number) {
 }
 
 // Transcribe audio
-async function transcribeAudio(audioData: Float32Array) {
+async function transcribeAudio(audioData: Float32Array, modelName = activeModelName || 'Xenova/whisper-base.en') {
     try {
-        if (!transcriber) {
-            await initializeModel();
+        if (!transcriber || activeModelName !== modelName) {
+            await initializeModel(modelName);
         }
 
         if (!transcriber) {
@@ -154,10 +189,13 @@ async function transcribeAudio(audioData: Float32Array) {
 
         self.postMessage({ type: 'progress', data: { status: 'transcribing', progress: 0, message: 'Transcribing audio...' } });
 
-        const output: any = await transcriber(audioData, {
+        const output = await transcriber(audioData, {
             return_timestamps: 'word',
-            chunk_length_s: 30,
-            stride_length_s: 5,
+            chunk_length_s: 20,
+            stride_length_s: 4,
+            task: 'transcribe',
+            language: 'english',
+            condition_on_previous_text: false,
         });
 
         // Process the output
@@ -165,12 +203,34 @@ async function transcribeAudio(audioData: Float32Array) {
 
         if (output.chunks) {
             // Word-level timestamps available
-            let currentSegment: any = null;
+            let currentSegment: {
+                id: string;
+                start: number;
+                end: number;
+                text: string;
+                words: {
+                    word: string;
+                    start: number;
+                    end: number;
+                }[];
+            } | null = null;
 
             for (let i = 0; i < output.chunks.length; i++) {
                 const chunk = output.chunks[i];
 
-                if (!currentSegment || (chunk.timestamp && chunk.timestamp[0] - currentSegment.end > 1.0)) {
+                const chunkText = chunk.text.trim();
+                if (!chunkText) continue;
+
+                const chunkStart = chunk.timestamp ? chunk.timestamp[0] : i * 0.5;
+                const chunkEnd = chunk.timestamp ? chunk.timestamp[1] : (i + 1) * 0.5;
+                const segmentIsLong = currentSegment && (
+                    currentSegment.words.length >= 8 ||
+                    currentSegment.end - currentSegment.start >= 3.5 ||
+                    /[.!?]$/.test(currentSegment.text.trim())
+                );
+                const startsAfterGap = currentSegment && chunkStart - currentSegment.end > 0.55;
+
+                if (!currentSegment || startsAfterGap || segmentIsLong) {
                     // Start a new segment
                     if (currentSegment) {
                         segments.push(currentSegment);
@@ -178,23 +238,23 @@ async function transcribeAudio(audioData: Float32Array) {
 
                     currentSegment = {
                         id: `segment-${segments.length}`,
-                        start: chunk.timestamp ? chunk.timestamp[0] : i * 0.5,
-                        end: chunk.timestamp ? chunk.timestamp[1] : (i + 1) * 0.5,
-                        text: chunk.text.trim(),
+                        start: chunkStart,
+                        end: chunkEnd,
+                        text: chunkText,
                         words: [{
-                            word: chunk.text.trim(),
-                            start: chunk.timestamp ? chunk.timestamp[0] : i * 0.5,
-                            end: chunk.timestamp ? chunk.timestamp[1] : (i + 1) * 0.5,
+                            word: chunkText,
+                            start: chunkStart,
+                            end: chunkEnd,
                         }],
                     };
                 } else {
                     // Add to current segment
-                    currentSegment.text += ' ' + chunk.text.trim();
-                    currentSegment.end = chunk.timestamp ? chunk.timestamp[1] : (i + 1) * 0.5;
+                    currentSegment.text += ' ' + chunkText;
+                    currentSegment.end = chunkEnd;
                     currentSegment.words.push({
-                        word: chunk.text.trim(),
-                        start: chunk.timestamp ? chunk.timestamp[0] : i * 0.5,
-                        end: chunk.timestamp ? chunk.timestamp[1] : (i + 1) * 0.5,
+                        word: chunkText,
+                        start: chunkStart,
+                        end: chunkEnd,
                     });
                 }
             }
@@ -223,10 +283,17 @@ async function transcribeAudio(audioData: Float32Array) {
             }
         }
 
-        self.postMessage({ type: 'complete', data: { segments } });
-    } catch (error: any) {
+        self.postMessage({
+            type: 'complete',
+            data: {
+                segments,
+                language: output.language || 'en',
+                model: activeModelName || modelName,
+            },
+        });
+    } catch (error) {
         console.error('Transcription error:', error);
-        self.postMessage({ type: 'error', data: { message: error.message } });
+        self.postMessage({ type: 'error', data: { message: error instanceof Error ? error.message : 'Transcription failed' } });
     }
 }
 
@@ -239,7 +306,7 @@ self.onmessage = async (e) => {
             await initializeModel(data.modelName);
             break;
         case 'transcribe':
-            await transcribeAudio(data.audioData);
+            await transcribeAudio(data.audioData, data.modelName || activeModelName);
             break;
         default:
             break;

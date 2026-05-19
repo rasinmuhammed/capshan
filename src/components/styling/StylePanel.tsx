@@ -14,6 +14,7 @@ import {
     PenTool
 } from 'lucide-react';
 import { useAppStore, STYLE_TEMPLATES } from '../../store/app.store';
+import type { CaptionStyle } from '../../types';
 
 const FONT_FAMILIES = [
     'Inter',
@@ -32,7 +33,7 @@ const DISPLAY_MODES = [
     { id: 'word-by-word', label: 'Word by Word', desc: 'Reveal one at a time' },
     { id: 'typewriter', label: 'Typewriter', desc: 'Typing animation' },
     { id: 'line-by-line', label: 'Line by Line', desc: 'Show full lines' },
-];
+] as const;
 
 const ANIMATIONS = [
     { id: 'none', label: 'None' },
@@ -41,6 +42,25 @@ const ANIMATIONS = [
     { id: 'pop', label: 'Pop' },
     { id: 'bounce', label: 'Bounce' },
     { id: 'scale', label: 'Scale' },
+] as const;
+
+type StyleTab = 'templates' | 'display' | 'text' | 'active' | 'effects';
+type TextTransform = CaptionStyle['textTransform'];
+type Position = CaptionStyle['position'];
+
+const STYLE_TABS: { id: StyleTab; icon: React.ReactNode; label: string }[] = [
+    { id: 'templates', icon: <Sparkles className="w-4 h-4" />, label: 'Styles' },
+    { id: 'display', icon: <Eye className="w-4 h-4" />, label: 'Display' },
+    { id: 'text', icon: <Type className="w-4 h-4" />, label: 'Text' },
+    { id: 'active', icon: <Layers className="w-4 h-4" />, label: 'Active' },
+    { id: 'effects', icon: <PenTool className="w-4 h-4" />, label: 'Effects' },
+];
+
+const TEXT_TRANSFORMS: { id: TextTransform; label: string; preview: string }[] = [
+    { id: 'none', label: 'Normal', preview: 'Aa' },
+    { id: 'uppercase', label: 'ALL CAPS', preview: 'AA' },
+    { id: 'lowercase', label: 'lower', preview: 'aa' },
+    { id: 'capitalize', label: 'Title', preview: 'Ab' },
 ];
 
 // Color Picker Component
@@ -115,7 +135,7 @@ const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React
 
 const StylePanel: React.FC = () => {
     const { captionStyle, setCaptionStyle, showStylePanel, setShowStylePanel } = useAppStore();
-    const [activeTab, setActiveTab] = useState<'templates' | 'display' | 'text' | 'active' | 'effects'>('templates');
+    const [activeTab, setActiveTab] = useState<StyleTab>('templates');
     const [isMobileExpanded, setIsMobileExpanded] = useState(false);
 
     const applyTemplate = (templateId: string) => {
@@ -185,16 +205,10 @@ const StylePanel: React.FC = () => {
 
                 {/* Tabs - Scrollable */}
                 <div className="flex overflow-x-auto border-b border-zinc-800 flex-shrink-0 hide-scrollbar">
-                    {[
-                        { id: 'templates', icon: <Sparkles className="w-4 h-4" />, label: 'Styles' },
-                        { id: 'display', icon: <Eye className="w-4 h-4" />, label: 'Display' },
-                        { id: 'text', icon: <Type className="w-4 h-4" />, label: 'Text' },
-                        { id: 'active', icon: <Layers className="w-4 h-4" />, label: 'Active' },
-                        { id: 'effects', icon: <PenTool className="w-4 h-4" />, label: 'Effects' },
-                    ].map(tab => (
+                    {STYLE_TABS.map((tab) => (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => setActiveTab(tab.id)}
                             className={`flex-1 min-w-[70px] flex flex-col items-center gap-1 py-2.5 px-2 transition-all text-xs ${activeTab === tab.id
                                 ? 'text-capshan-gold border-b-2 border-capshan-gold bg-capshan-gold/5'
                                 : 'text-zinc-500 hover:text-white'
@@ -218,15 +232,10 @@ const StylePanel: React.FC = () => {
                                     <span className="text-xs font-bold text-white uppercase tracking-wide">Text Case</span>
                                 </div>
                                 <div className="grid grid-cols-4 gap-1.5">
-                                    {[
-                                        { id: 'none', label: 'Normal', preview: 'Aa' },
-                                        { id: 'uppercase', label: 'ALL CAPS', preview: 'AA' },
-                                        { id: 'lowercase', label: 'lower', preview: 'aa' },
-                                        { id: 'capitalize', label: 'Title', preview: 'Ab' },
-                                    ].map((t) => (
+                                    {TEXT_TRANSFORMS.map((t) => (
                                         <button
                                             key={t.id}
-                                            onClick={() => setCaptionStyle({ textTransform: t.id as any })}
+                                            onClick={() => setCaptionStyle({ textTransform: t.id })}
                                             className={`py-2.5 px-2 rounded-lg text-center transition-all ${captionStyle.textTransform === t.id
                                                     ? 'bg-capshan-gold text-black'
                                                     : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
@@ -290,7 +299,7 @@ const StylePanel: React.FC = () => {
                                 <div className="grid grid-cols-3 gap-2">
                                     <button
                                         onClick={() => applyTemplate('hormozi')}
-                                        className={`p-3 rounded-xl border text-center transition-all ${captionStyle.templateId === 'hormozi' || captionStyle.templateId === 'viral' || captionStyle.templateId === 'neon'
+                                        className={`p-3 rounded-xl border text-center transition-all ${captionStyle.templateId === 'hormozi' || captionStyle.templateId === 'gamer' || captionStyle.templateId === 'meme'
                                                 ? 'border-red-500 bg-red-500/10 shadow-[0_0_15px_rgba(239,68,68,0.3)]'
                                                 : 'border-zinc-700 bg-zinc-900/50 hover:border-red-500/50'
                                             }`}
@@ -300,8 +309,8 @@ const StylePanel: React.FC = () => {
                                         <div className="text-[10px] text-zinc-500 mt-0.5">Pop-in</div>
                                     </button>
                                     <button
-                                        onClick={() => applyTemplate('aesthetic')}
-                                        className={`p-3 rounded-xl border text-center transition-all ${captionStyle.templateId === 'aesthetic'
+                                        onClick={() => applyTemplate('karaoke-fill')}
+                                        className={`p-3 rounded-xl border text-center transition-all ${captionStyle.templateId === 'karaoke-fill'
                                                 ? 'border-cyan-400 bg-cyan-400/10 shadow-[0_0_15px_rgba(34,211,238,0.3)]'
                                                 : 'border-zinc-700 bg-zinc-900/50 hover:border-cyan-400/50'
                                             }`}
@@ -311,8 +320,8 @@ const StylePanel: React.FC = () => {
                                         <div className="text-[10px] text-zinc-500 mt-0.5">Fill Effect</div>
                                     </button>
                                     <button
-                                        onClick={() => applyTemplate('minimal')}
-                                        className={`p-3 rounded-xl border text-center transition-all ${captionStyle.templateId === 'minimal' || captionStyle.templateId === 'classic'
+                                        onClick={() => applyTemplate('veed-clean')}
+                                        className={`p-3 rounded-xl border text-center transition-all ${captionStyle.templateId === 'veed-clean' || captionStyle.templateId === 'minimal-pro'
                                                 ? 'border-pink-400 bg-pink-400/10 shadow-[0_0_15px_rgba(244,114,182,0.3)]'
                                                 : 'border-zinc-700 bg-zinc-900/50 hover:border-pink-400/50'
                                             }`}
@@ -337,10 +346,10 @@ const StylePanel: React.FC = () => {
                                                 : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700'
                                                 }`}
                                         >
-                                            <div className="text-2xl mb-1">{template.preview}</div>
+                                            <div className="text-lg mb-1 font-black">{template.preview}</div>
                                             <div className="font-bold text-sm text-white">{template.name}</div>
                                             <div className="text-xs text-zinc-500 mt-1" style={{ fontFamily: template.style.fontFamily }}>
-                                                {template.style.fontFamily}
+                                                {template.category}
                                             </div>
                                         </button>
                                     ))}
@@ -357,7 +366,7 @@ const StylePanel: React.FC = () => {
                                     {DISPLAY_MODES.map((mode) => (
                                         <button
                                             key={mode.id}
-                                            onClick={() => setCaptionStyle({ displayMode: mode.id as any })}
+                                            onClick={() => setCaptionStyle({ displayMode: mode.id })}
                                             className={`p-3 rounded-lg border text-left transition-all ${captionStyle.displayMode === mode.id
                                                 ? 'border-capshan-gold bg-capshan-gold/10'
                                                 : 'border-zinc-800 hover:border-zinc-700'
@@ -375,7 +384,7 @@ const StylePanel: React.FC = () => {
                                     {ANIMATIONS.map((anim) => (
                                         <button
                                             key={anim.id}
-                                            onClick={() => setCaptionStyle({ animation: anim.id as any })}
+                                            onClick={() => setCaptionStyle({ animation: anim.id })}
                                             className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${captionStyle.animation === anim.id
                                                 ? 'bg-capshan-gold text-black'
                                                 : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
@@ -425,10 +434,10 @@ const StylePanel: React.FC = () => {
                                     <div className="flex gap-2">
                                         <span className="text-xs text-zinc-400 w-20">Position</span>
                                         <div className="flex gap-1 flex-1">
-                                            {['top', 'center', 'bottom'].map((pos) => (
+                                            {(['top', 'center', 'bottom'] as Position[]).map((pos) => (
                                                 <button
                                                     key={pos}
-                                                    onClick={() => setCaptionStyle({ position: pos as any })}
+                                                    onClick={() => setCaptionStyle({ position: pos })}
                                                     className={`flex-1 py-2 rounded text-xs font-medium capitalize ${captionStyle.position === pos
                                                         ? 'bg-capshan-gold text-black'
                                                         : 'bg-zinc-800 text-zinc-400'
@@ -487,10 +496,10 @@ const StylePanel: React.FC = () => {
                                     <div className="flex gap-2">
                                         <span className="text-xs text-zinc-400 w-24">Transform</span>
                                         <div className="flex gap-1 flex-1">
-                                            {['none', 'uppercase', 'capitalize'].map((t) => (
+                                            {(['none', 'uppercase', 'capitalize'] as TextTransform[]).map((t) => (
                                                 <button
                                                     key={t}
-                                                    onClick={() => setCaptionStyle({ textTransform: t as any })}
+                                                    onClick={() => setCaptionStyle({ textTransform: t })}
                                                     className={`flex-1 py-1.5 rounded text-xs font-medium ${captionStyle.textTransform === t
                                                         ? 'bg-capshan-gold text-black'
                                                         : 'bg-zinc-800 text-zinc-400'

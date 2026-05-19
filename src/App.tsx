@@ -6,7 +6,6 @@ import EditorLayout from './components/editor/EditorLayout';
 import TranscriptionProcessor from './components/upload/TranscriptionProcessor';
 import StylePanel from './components/styling/StylePanel';
 import KeyboardShortcutsModal from './components/ui/KeyboardShortcutsModal';
-import OnboardingTour from './components/ui/OnboardingTour';
 import { ToastProvider } from './components/ui/Toast';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
@@ -68,9 +67,6 @@ function App() {
           onClose={() => setShowShortcuts(false)}
         />
 
-        {/* Onboarding Tour */}
-        {mediaFile && <OnboardingTour />}
-
         {/* Main Content with Page Transitions */}
         <AnimatePresence mode="wait">
           {!mediaFile ? (
@@ -103,4 +99,3 @@ function App() {
 }
 
 export default App;
-

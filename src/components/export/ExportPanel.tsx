@@ -10,7 +10,28 @@ const ASPECT_RATIOS = [
     { id: '16:9', label: 'Landscape', icon: Monitor, desc: 'YouTube, Web' },
     { id: '9:16', label: 'Portrait', icon: Smartphone, desc: 'TikTok, Reels' },
     { id: '1:1', label: 'Square', icon: Square, desc: 'Instagram Feed' },
-];
+] as const;
+
+type ExportAspectRatio = typeof ASPECT_RATIOS[number]['id'];
+
+interface FileSystemWritableFileStream {
+    write: (data: Blob) => Promise<void>;
+    close: () => Promise<void>;
+}
+
+interface SaveFileHandle {
+    createWritable: () => Promise<FileSystemWritableFileStream>;
+}
+
+interface WindowWithSavePicker extends Window {
+    showSaveFilePicker?: (options: {
+        suggestedName: string;
+        types: {
+            description: string;
+            accept: Record<string, string[]>;
+        }[];
+    }) => Promise<SaveFileHandle>;
+}
 
 const ExportPanel: React.FC = () => {
     const { segments, mediaFile, captionStyle, setError, exportAspectRatio, setExportAspectRatio } = useAppStore();
@@ -63,18 +84,19 @@ const ExportPanel: React.FC = () => {
         const filename = `${baseName}_captions.mp4`;
 
         // Get file handle FIRST while we still have user gesture
-        let fileHandle: any = null;
-        if ('showSaveFilePicker' in window) {
+        let fileHandle: SaveFileHandle | null = null;
+        const savePickerWindow = window as WindowWithSavePicker;
+        if (savePickerWindow.showSaveFilePicker) {
             try {
-                fileHandle = await (window as any).showSaveFilePicker({
+                fileHandle = await savePickerWindow.showSaveFilePicker({
                     suggestedName: filename,
                     types: [{
                         description: 'MP4 Video',
                         accept: { 'video/mp4': ['.mp4'] }
                     }]
                 });
-            } catch (err: any) {
-                if (err.name === 'AbortError') {
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') {
                     // User cancelled
                     return;
                 }
@@ -116,8 +138,8 @@ const ExportPanel: React.FC = () => {
                 setIsExporting(false);
                 setExportStatus('');
             }, 2000);
-        } catch (error: any) {
-            setError(error.message);
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Export failed');
             setIsExporting(false);
             setExportStatus('');
         }
@@ -131,7 +153,7 @@ const ExportPanel: React.FC = () => {
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass p-4 rounded-xl"
+            className="export-panel glass p-4 rounded-xl"
         >
             <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="w-4 h-4 text-capshan-gold" />
@@ -147,7 +169,7 @@ const ExportPanel: React.FC = () => {
                         return (
                             <button
                                 key={ratio.id}
-                                onClick={() => setExportAspectRatio(ratio.id as any)}
+                                onClick={() => setExportAspectRatio(ratio.id as ExportAspectRatio)}
                                 className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-all ${exportAspectRatio === ratio.id
                                     ? 'bg-capshan-gold/20 border border-capshan-gold/50 text-capshan-gold'
                                     : 'bg-zinc-800/50 border border-transparent hover:bg-zinc-800 text-zinc-400'
@@ -163,6 +185,9 @@ const ExportPanel: React.FC = () => {
 
             <div className="space-y-3">
                 {/* Video Export */}
+                <p className="text-[11px] text-zinc-500">
+                    MP4 export uses the optional localhost FFmpeg helper. Subtitle files export directly in your browser.
+                </p>
                 <motion.button
                     whileHover={{ scale: 1.01 }}
                     whileTap={{ scale: 0.99 }}

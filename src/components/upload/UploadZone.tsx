@@ -1,28 +1,37 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, Sparkles, Zap, Play, Star, Shield, Lock, Cpu, Check } from 'lucide-react';
 import { useAppStore } from '../../store/app.store';
 import { mockSegments } from '../../utils/mockData';
+import { TRANSCRIPTION_MODELS } from '../../utils/transcriptionModels';
 
 const TRUST_BADGES = [
-    { icon: Shield, label: '100% Private', desc: 'Your video never leaves your browser' },
-    { icon: Lock, label: 'No Upload', desc: 'Everything processes locally' },
+    { icon: Shield, label: 'Local-first', desc: 'No hosted cloud upload required' },
+    { icon: Lock, label: 'Private by default', desc: 'Browser transcript and subtitle export' },
     { icon: Cpu, label: 'AI-Powered', desc: 'Whisper AI runs in your browser' },
 ];
 
 const FEATURES = [
     { icon: Zap, label: 'Instant', color: 'text-yellow-400' },
     { icon: Star, label: 'Word-by-word', color: 'text-blue-400' },
-    { icon: Sparkles, label: '6 Viral Styles', color: 'text-pink-400' },
+    { icon: Sparkles, label: '9 Viral Styles', color: 'text-pink-400' },
     { icon: Check, label: '100% Free', color: 'text-green-400' },
 ];
 
 const UploadZone: React.FC = () => {
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const { setMediaFile, setError, setSegments } = useAppStore();
+    const {
+        setMediaFile,
+        setError,
+        setSegments,
+        setTranscriptMetadata,
+        setViralSuggestion,
+        transcriptionModel,
+        setTranscriptionModel,
+    } = useAppStore();
 
-    const handleFile = async (file: File) => {
+    const handleFile = useCallback(async (file: File) => {
         const type = file.type;
 
         if (!type.startsWith('audio/') && !type.startsWith('video/')) {
@@ -37,6 +46,9 @@ const UploadZone: React.FC = () => {
         element.src = url;
 
         element.onloadedmetadata = () => {
+            setSegments([]);
+            setTranscriptMetadata(null);
+            setViralSuggestion(null);
             setMediaFile({
                 file,
                 url,
@@ -45,17 +57,25 @@ const UploadZone: React.FC = () => {
                 name: file.name,
             });
         };
-    };
+    }, [setError, setMediaFile, setSegments, setTranscriptMetadata, setViralSuggestion]);
 
     const handleTestWithMockData = () => {
         setMediaFile({
             file: new File([], 'test-video.mp4'),
-            url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+            url: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
             type: 'video',
-            duration: 596.5,
-            name: 'Big Buck Bunny (Test)',
+            duration: 5.1,
+            name: 'Sample Video',
         });
         setSegments(mockSegments);
+        setTranscriptMetadata({
+            language: 'en',
+            engine: 'browser-whisper',
+            model: 'sample-transcript',
+            confidence: 0.92,
+            generatedAt: new Date().toISOString(),
+        });
+        setViralSuggestion(null);
     };
 
     const onDrop = useCallback((e: React.DragEvent) => {
@@ -65,7 +85,7 @@ const UploadZone: React.FC = () => {
         if (file && (file.type.startsWith('video/') || file.type.startsWith('audio/'))) {
             handleFile(file);
         }
-    }, []);
+    }, [handleFile]);
 
     const onDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -108,7 +128,7 @@ const UploadZone: React.FC = () => {
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/10 border border-green-500/30 mb-4"
                     >
                         <Shield className="w-4 h-4 text-green-400" />
-                        <span className="text-sm font-bold text-green-400">100% Private • Runs in Browser</span>
+                        <span className="text-sm font-bold text-green-400">Local-first • Open Source</span>
                     </motion.div>
 
                     <motion.h1
@@ -128,8 +148,8 @@ const UploadZone: React.FC = () => {
                         transition={{ duration: 0.6, delay: 0.4 }}
                         className="text-lg md:text-xl text-zinc-400 max-w-xl mx-auto"
                     >
-                        Word-by-word animations. VEED-style templates.
-                        <span className="text-white font-semibold"> Your video never leaves your device.</span>
+                        Word-by-word animations. Hook analysis. Creator presets.
+                        <span className="text-white font-semibold"> No signup or watermark.</span>
                     </motion.p>
                 </motion.div>
 
@@ -207,6 +227,40 @@ const UploadZone: React.FC = () => {
                     </div>
                 </motion.div>
 
+                {/* Accuracy Selector */}
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.6 }}
+                    className="mt-4 w-full max-w-2xl rounded-xl border border-zinc-800 bg-zinc-950/70 p-3"
+                >
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2">
+                            <Cpu className="w-4 h-4 text-capshan-gold" />
+                            <span className="text-xs font-bold uppercase tracking-wide text-zinc-300">Caption Accuracy</span>
+                        </div>
+                        <span className="text-[10px] text-zinc-500">{transcriptionModel.estimatedSize} first download</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        {TRANSCRIPTION_MODELS.map((model) => (
+                            <button
+                                key={model.id}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    setTranscriptionModel(model);
+                                }}
+                                className={`rounded-lg border p-2 text-left transition-colors ${transcriptionModel.id === model.id
+                                        ? 'border-capshan-gold bg-capshan-gold/10'
+                                        : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
+                                    }`}
+                            >
+                                <div className="text-xs font-bold text-white">{model.label}</div>
+                                <div className="mt-1 text-[10px] leading-snug text-zinc-500">{model.description}</div>
+                            </button>
+                        ))}
+                    </div>
+                </motion.div>
+
                 {/* Trust Badges */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -251,6 +305,3 @@ const UploadZone: React.FC = () => {
 };
 
 export default UploadZone;
-
-
-
